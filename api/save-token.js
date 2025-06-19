@@ -1,14 +1,31 @@
 const admin = require('firebase-admin');
 const cors = require('cors')({ origin: true });
 
-if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+function initFirebase() {
+  if (!admin.apps.length) {
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT no está definida');
+    }
+    let serviceAccount;
+    try {
+      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } catch (e) {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT no es un JSON válido');
+    }
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+  }
 }
 
 module.exports = async (req, res) => {
+  try {
+    initFirebase();
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: error.message });
+  }
+
   await cors(req, res);
 
   if (req.method !== 'POST') {
