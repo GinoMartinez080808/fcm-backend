@@ -1,42 +1,50 @@
+// Description: Backend for Firebase Cloud Messaging (FCM) to handle subscriptions and notifications
 const express = require('express');
+const bodyParser = require('body-parser');
 const admin = require('firebase-admin');
 const cors = require('cors');
 
-const serviceAccount = require('./api-rifa-c10aa-firebase-adminsdk-fbsvc-605adf8bed.json'); // Aquí va tu JSON de cuenta de servicio
+const serviceAccount = require('./api-rifa-c10aa-firebase-adminsdk-fbsvc-605adf8bed.json');
+
+const app = express();
+app.use(bodyParser.json());
+app.use(cors());
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+// ✅ Ruta para suscribir un token al topic "admin"
+app.post('/subscribe', async (req, res) => {
+  const { token } = req.body;
 
-app.post('/send-notification', async (req, res) => {
-  const { token, title, body } = req.body;
-
-  if (!token || !title || !body) {
-    return res.status(400).send('Missing token, title, or body');
-  }
-
-  const message = {
-    notification: {
-      title,
-      body
-    },
-    token
-  };
+  if (!token) return res.status(400).send('Token requerido');
 
   try {
-    const response = await admin.messaging().send(message);
-    res.send({ success: true, response });
+    await admin.messaging().subscribeToTopic(token, 'admin');
+    res.status(200).send('Suscrito al topic admin');
   } catch (error) {
-    console.error('Error sending message:', error);
-    res.status(500).send({ success: false, error: error.message });
+    console.error('Error al suscribirse:', error);
+    res.status(500).send('Error al suscribirse');
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+// ✅ Ruta para enviar notificación a topic "admin"
+app.post('/send-notification', async (req, res) => {
+  const { title, body } = req.body;
+
+  try {
+    const message = {
+      notification: { title, body },
+      topic: 'admin'
+    };
+
+    const response = await admin.messaging().send(message);
+    res.status(200).send(`Notificación enviada: ${response}`);
+  } catch (error) {
+    console.error('Error al enviar notificación:', error);
+    res.status(500).send('Error enviando notificación');
+  }
 });
+
+module.exports = app;
