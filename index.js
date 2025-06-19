@@ -12,7 +12,7 @@ const app = express();
 // Middleware
 app.use(bodyParser.json());
 app.use(cors({
-  origin: ['http://localhost:4200'], // O reemplaza con '*' si deseas permitir todo
+  origin: '*',  // Aceptar todos los orígenes, para pruebas. En producción restringir a tu frontend real.
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type']
 }));
@@ -22,7 +22,7 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
-// ✅ Ruta para guardar un token (dummy)
+// Ruta para guardar un token (dummy)
 app.post('/api/save-token', async (req, res) => {
   const { token } = req.body;
 
@@ -36,7 +36,7 @@ app.post('/api/save-token', async (req, res) => {
   return res.status(200).json({ message: 'Token guardado correctamente' });
 });
 
-// ✅ Ruta para suscribirse al topic "admin"
+// Ruta para suscribirse al topic "admin"
 app.post('/subscribe', async (req, res) => {
   const { token } = req.body;
 
@@ -51,7 +51,7 @@ app.post('/subscribe', async (req, res) => {
   }
 });
 
-// ✅ Ruta para enviar notificación al topic "admin"
+// Ruta para enviar notificación al topic "admin"
 app.post('/send-notification', async (req, res) => {
   const { title, body } = req.body;
 
@@ -73,8 +73,5 @@ app.post('/send-notification', async (req, res) => {
   }
 });
 
-// ✅ Listener para entorno local (omite en Vercel)
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor escuchando en http://localhost:${PORT}`);
-});
+// Exportar la app para que Vercel la use como Serverless Function
+module.exports = app;
