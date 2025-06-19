@@ -1,5 +1,14 @@
 const admin = require('firebase-admin');
-const cors = require('cors')({ origin: true });
+const Cors = require('cors');
+const cors = Cors({ origin: true });
+
+function runMiddleware(req, res, fn) {
+  return new Promise((resolve, reject) => {
+    fn(req, res, (result) => {
+      return result instanceof Error ? reject(result) : resolve(result);
+    });
+  });
+}
 
 function initFirebase() {
   if (!admin.apps.length) {
@@ -20,26 +29,21 @@ function initFirebase() {
 
 module.exports = async (req, res) => {
   try {
+    await runMiddleware(req, res, cors);
     initFirebase();
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message });
-  }
 
-  await cors(req, res);
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Método no permitido' });
+    }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método no permitido' });
-  }
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: 'Token requerido' });
+    }
 
-  const { token } = req.body;
-  if (!token) {
-    return res.status(400).json({ error: 'Token requerido' });
-  }
-
-  try {
     await admin.messaging().subscribeToTopic(token, 'admin');
     return res.status(200).json({ message: 'Suscrito al topic admin' });
+
   } catch (error) {
     console.error('Error al suscribirse al topic:', error);
     return res.status(500).json({ error: 'Error al suscribirse al topic' });

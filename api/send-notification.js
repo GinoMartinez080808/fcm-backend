@@ -1,5 +1,14 @@
 const admin = require('firebase-admin');
-const cors = require('cors')({ origin: true });
+const Cors = require('cors');
+const cors = Cors({ origin: true });
+
+function runMiddleware(req, res, fn) {
+  return new Promise((resolve, reject) => {
+    fn(req, res, (result) => {
+      return result instanceof Error ? reject(result) : resolve(result);
+    });
+  });
+}
 
 function initFirebase() {
   if (!admin.apps.length) {
@@ -20,24 +29,18 @@ function initFirebase() {
 
 module.exports = async (req, res) => {
   try {
+    await runMiddleware(req, res, cors);
     initFirebase();
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message });
-  }
 
-  await cors(req, res);
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Método no permitido' });
+    }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método no permitido' });
-  }
+    const { title, body } = req.body;
+    if (!title || !body) {
+      return res.status(400).json({ error: 'Título y cuerpo requeridos' });
+    }
 
-  const { title, body } = req.body;
-  if (!title || !body) {
-    return res.status(400).json({ error: 'Título y cuerpo requeridos' });
-  }
-
-  try {
     const message = {
       notification: { title, body },
       topic: 'admin',
@@ -45,6 +48,7 @@ module.exports = async (req, res) => {
 
     const response = await admin.messaging().send(message);
     return res.status(200).json({ message: 'Notificación enviada', response });
+
   } catch (error) {
     console.error('Error enviando notificación:', error);
     return res.status(500).json({ error: 'Error enviando notificación' });
