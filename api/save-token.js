@@ -41,7 +41,12 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Token requerido' });
     }
 
-    console.log('Token recibido:', token);
+    const db = admin.firestore();
+    await db.collection('tokens').doc(token).set({
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    console.log('Token guardado en Firestore:', token);
     return res.status(200).json({ message: 'Token guardado correctamente' });
   } catch (error) {
     console.error(error);
