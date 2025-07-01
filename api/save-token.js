@@ -12,15 +12,7 @@ function runMiddleware(req, res, fn) {
 
 function initFirebase() {
   if (!admin.apps.length) {
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT no está definida');
-    }
-    let serviceAccount;
-    try {
-      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    } catch (e) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT no es un JSON válido');
-    }
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
@@ -41,15 +33,21 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Token requerido' });
     }
 
+    // Guardar token en Firestore
     const db = admin.firestore();
     await db.collection('tokens').doc(token).set({
+      token,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    console.log('Token guardado en Firestore:', token);
-    return res.status(200).json({ message: 'Token guardado correctamente' });
+    // Suscribirse al topic 'admin'
+    await admin.messaging().subscribeToTopic(token, 'admin');
+
+    console.log('Token guardado y suscrito:', token);
+    return res.status(200).json({ message: 'Token guardado y suscrito correctamente' });
+
   } catch (error) {
-    console.error(error);
+    console.error('Error en save-token:', error);
     return res.status(500).json({ error: error.message });
   }
 };
