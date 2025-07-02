@@ -49,7 +49,6 @@ module.exports = async (req, res) => {
     const db = admin.firestore();
     const snapshot = await db.collection('tokens').get();
 
-    // Usamos un Set para eliminar duplicados
     const tokensSet = new Set();
     snapshot.docs.forEach(doc => {
       const data = doc.data();
@@ -71,15 +70,12 @@ module.exports = async (req, res) => {
     }
 
     const messaging = getMessaging();
-
-    // Resultado acumulado
     const results = {
       successCount: 0,
       failureCount: 0,
       failedTokens: [],
     };
 
-    // Enviamos mensaje por mensaje para control fino
     for (const token of tokens) {
       if (!token || token.trim() === '') {
         console.warn('Token vacío o inválido detectado y omitido:', token);
@@ -90,7 +86,25 @@ module.exports = async (req, res) => {
 
       const message = {
         token,
-        notification: { title, body },
+        webpush: {
+          notification: {
+            title,
+            body,
+            icon: 'https://i.ibb.co/j983vzJq/Imagen-de-Whats-App-2025-05-03-a-las-16-15-27-7c7c729d.jpg',
+            vibrate: [100, 50, 100],
+            tag: 'rifa-notification',
+            actions: [
+              {
+                action: 'open_url',
+                title: 'Abrir',
+                icon: 'https://i.ibb.co/j983vzJq/Imagen-de-Whats-App-2025-05-03-a-las-16-15-27-7c7c729d.jpg'
+              }
+            ],
+            data: {
+              url: 'http://aquiganantodos.com/admin' // Puedes hacer esto dinámico si lo deseas
+            }
+          }
+        }
       };
 
       try {
