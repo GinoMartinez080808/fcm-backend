@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const { getMessaging } = require('firebase-admin/messaging');
 const Cors = require('cors');
 const cors = Cors({ origin: true });
 
@@ -37,17 +38,21 @@ module.exports = async (req, res) => {
     }
 
     const { token } = req.body;
-    if (!token) {
-      return res.status(400).json({ error: 'Token requerido' });
+    if (!token || typeof token !== 'string' || !token.trim()) {
+      return res.status(400).json({ error: 'Token requerido y debe ser una cadena válida' });
     }
 
-    // Aquí corregimos: token en array
-    await admin.messaging().subscribeToTopic([token], 'admin');
+    // Usar getMessaging() en lugar de admin.messaging()
+    const messaging = getMessaging();
+    await messaging.subscribeToTopic([token], 'admin');
 
     return res.status(200).json({ message: 'Suscrito al topic admin' });
 
   } catch (error) {
     console.error('Error al suscribirse al topic:', error);
-    return res.status(500).json({ error: 'Error al suscribirse al topic' });
+    return res.status(500).json({
+      error: 'Error al suscribirse al topic',
+      detail: error.message || 'Error desconocido',
+    });
   }
 };
