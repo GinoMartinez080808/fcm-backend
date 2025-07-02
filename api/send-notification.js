@@ -12,15 +12,19 @@ function runMiddleware(req, res, fn) {
 
 function initFirebase() {
   if (!admin.apps.length) {
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!raw) {
       throw new Error('FIREBASE_SERVICE_ACCOUNT no está definida');
     }
+
     let serviceAccount;
     try {
-      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      serviceAccount = JSON.parse(raw);
     } catch (e) {
+      console.error('FIREBASE_SERVICE_ACCOUNT inválida:', e.message);
       throw new Error('FIREBASE_SERVICE_ACCOUNT no es un JSON válido');
     }
+
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
@@ -45,10 +49,14 @@ module.exports = async (req, res) => {
     const snapshot = await db.collection('tokens').get();
 
     const tokens = snapshot.docs
-      .map(doc => doc.data().token)
-      .filter(token => typeof token === 'string' && token.length > 0);
+      .map(doc => {
+        const data = doc.data();
+        return typeof data.token === 'string' ? data.token.trim() : null;
+      })
+      .filter(token => !!token && token.length > 0);
 
     if (tokens.length === 0) {
+      console.warn('No hay tokens válidos para enviar notificación.');
       return res.status(400).json({ error: 'No hay tokens válidos registrados' });
     }
 
@@ -57,22 +65,35 @@ module.exports = async (req, res) => {
       tokens,
     };
 
-    const response = await admin.messaging().sendMulticast(message);
-    console.log('Multicast response:', JSON.stringify(response, null, 2));
-
-    if (response.failureCount > 0) {
-      const failedTokens = [];
-      response.responses.forEach((resp, idx) => {
-        if (!resp.success) {
-          failedTokens.push({ token: tokens[idx], error: resp.error });
-        }
-      });
-      console.error('Errores al enviar a algunos tokens:', failedTokens);
+    let response;
+    try {
+      response = await admin.messaging().sendMulticast(message);
+    } catch (sendError) {
+      console.error('Fallo en sendMulticast:', sendError.message);
+      return res.status(500).json({ error: 'Error al enviar notificación', detail: sendError.message });
     }
 
-    return res.status(200).json({ message: 'Notificación enviada', response });
+    console.log('Multicast response:', JSON.stringify(response, null, 2));
+
+    const failed = [];
+    response.responses.forEach((resp, index) => {
+      if (!resp.success) {
+        failed.push({
+          token: tokens[index],
+          error: resp.error?.message || 'Desconocido',
+        });
+      }
+    });
+
+    return res.status(200).json({
+      message: 'Notificación enviada',
+      successCount: response.successCount,
+      failureCount: response.failureCount,
+      failed,
+    });
+
   } catch (error) {
-    console.error('Error enviando notificación:', error);
-    return res.status(500).json({ error: 'Error enviando notificación' });
+    console.error('Error general al enviar notificación:', error.message, error.stack);
+    return res.status(500).json({ error: 'Error enviando notificación', detail: error.message });
   }
 };
