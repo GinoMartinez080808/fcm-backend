@@ -49,11 +49,18 @@ module.exports = async (req, res) => {
     const db = admin.firestore();
     const snapshot = await db.collection('tokens').get();
 
+    // Usamos un Set para eliminar duplicados
     const tokensSet = new Set();
     snapshot.docs.forEach(doc => {
       const data = doc.data();
-      if (data.token && typeof data.token === 'string' && data.token.trim().length > 0) {
+      if (
+        data.token &&
+        typeof data.token === 'string' &&
+        data.token.trim().length > 0
+      ) {
         tokensSet.add(data.token.trim());
+      } else {
+        console.warn('Token inválido omitido:', data.token);
       }
     });
     const tokens = Array.from(tokensSet);
@@ -65,22 +72,40 @@ module.exports = async (req, res) => {
 
     const messaging = getMessaging();
 
-    const message = {
-      tokens,
-      notification: { title, body },
+    // Resultado acumulado
+    const results = {
+      successCount: 0,
+      failureCount: 0,
+      failedTokens: [],
     };
 
-    // Ahora usamos `send` para enviar multicast
-    const response = await messaging.send(message);
+    // Enviamos mensaje por mensaje para control fino
+    for (const token of tokens) {
+      if (!token || token.trim() === '') {
+        console.warn('Token vacío o inválido detectado y omitido:', token);
+        results.failureCount++;
+        results.failedTokens.push({ token, error: 'Token inválido' });
+        continue;
+      }
 
-    // En v13+, send() para multicast devuelve un objeto con `successCount` y `failureCount`, pero no responses individuales
-    // Si necesitas detalles más específicos, hay que enviar mensaje por mensaje
+      const message = {
+        token,
+        notification: { title, body },
+      };
+
+      try {
+        console.log('Enviando notificación al token:', token);
+        await messaging.send(message);
+        results.successCount++;
+      } catch (error) {
+        results.failureCount++;
+        results.failedTokens.push({ token, error: error.message || 'Error desconocido' });
+      }
+    }
 
     return res.status(200).json({
-      message: 'Notificación enviada',
-      successCount: response.successCount || 'desconocido',
-      failureCount: response.failureCount || 'desconocido',
-      response,
+      message: 'Notificación enviada con detalle por token',
+      ...results,
     });
 
   } catch (error) {
