@@ -41,7 +41,9 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Token requerido' });
     }
 
-    await admin.messaging().subscribeToTopic(token, 'admin');
+    // Aquí corregimos: token en array
+    await admin.messaging().subscribeToTopic([token], 'admin');
+
     return res.status(200).json({ message: 'Suscrito al topic admin' });
 
   } catch (error) {
