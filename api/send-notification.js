@@ -42,26 +42,35 @@ module.exports = async (req, res) => {
     }
 
     const db = admin.firestore();
-const snapshot = await db.collection('tokens').get();
+    const snapshot = await db.collection('tokens').get();
 
-const tokens = [];
-snapshot.forEach(doc => {
-  tokens.push(doc.id); // el doc ID es el token
-});
+    const tokens = snapshot.docs
+      .map(doc => doc.data().token)
+      .filter(token => typeof token === 'string' && token.length > 0);
 
-if (tokens.length === 0) {
-  return res.status(400).json({ error: 'No hay tokens registrados' });
-}
+    if (tokens.length === 0) {
+      return res.status(400).json({ error: 'No hay tokens válidos registrados' });
+    }
 
-const message = {
-  notification: { title, body },
-  tokens, // usa `tokens` en vez de `topic`
-};
+    const message = {
+      notification: { title, body },
+      tokens,
+    };
 
-const response = await admin.messaging().sendMulticast(message);
-console.log('Multicast response:', response);
-return res.status(200).json({ message: 'Notificación enviada a múltiples tokens', response });
+    const response = await admin.messaging().sendMulticast(message);
+    console.log('Multicast response:', JSON.stringify(response, null, 2));
 
+    if (response.failureCount > 0) {
+      const failedTokens = [];
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success) {
+          failedTokens.push({ token: tokens[idx], error: resp.error });
+        }
+      });
+      console.error('Errores al enviar a algunos tokens:', failedTokens);
+    }
+
+    return res.status(200).json({ message: 'Notificación enviada', response });
   } catch (error) {
     console.error('Error enviando notificación:', error);
     return res.status(500).json({ error: 'Error enviando notificación' });
