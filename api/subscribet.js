@@ -1,7 +1,7 @@
 const admin = require('firebase-admin');
 const { getMessaging } = require('firebase-admin/messaging');
 const Cors = require('cors');
-const cors = Cors({ origin: true });
+const cors = Cors({ origin: true }); // Solo permite el origen que lo hizo
 
 function runMiddleware(req, res, fn) {
   return new Promise((resolve, reject) => {
@@ -13,15 +13,15 @@ function runMiddleware(req, res, fn) {
 
 function initFirebase() {
   if (!admin.apps.length) {
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT no está definida');
-    }
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!raw) throw new Error('FIREBASE_SERVICE_ACCOUNT no está definida');
     let serviceAccount;
     try {
-      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      serviceAccount = JSON.parse(raw);
     } catch (e) {
       throw new Error('FIREBASE_SERVICE_ACCOUNT no es un JSON válido');
     }
+
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
@@ -29,6 +29,15 @@ function initFirebase() {
 }
 
 module.exports = async (req, res) => {
+  // Primero permite CORS de forma manual
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Puedes reemplazar '*' por 'http://localhost:4200'
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end(); // Maneja la preflight request
+  }
+
   try {
     await runMiddleware(req, res, cors);
     initFirebase();
@@ -42,7 +51,6 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Token requerido y debe ser una cadena válida' });
     }
 
-    // Usar getMessaging() en lugar de admin.messaging()
     const messaging = getMessaging();
     await messaging.subscribeToTopic([token], 'admin');
 
