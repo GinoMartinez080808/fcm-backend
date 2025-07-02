@@ -48,47 +48,41 @@ module.exports = async (req, res) => {
     const db = admin.firestore();
     const snapshot = await db.collection('tokens').get();
 
-    const tokens = snapshot.docs
-      .map(doc => {
-        const data = doc.data();
-        return typeof data.token === 'string' ? data.token.trim() : null;
-      })
-      .filter(token => !!token && token.length > 0);
+    // Extraer tokens y eliminar duplicados
+    const tokensSet = new Set();
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.token && typeof data.token === 'string' && data.token.trim().length > 0) {
+        tokensSet.add(data.token.trim());
+      }
+    });
+    const tokens = Array.from(tokensSet);
 
     if (tokens.length === 0) {
       console.warn('No hay tokens válidos para enviar notificación.');
       return res.status(400).json({ error: 'No hay tokens válidos registrados' });
     }
 
-    const message = {
+    const messagePayload = {
       notification: { title, body },
-      tokens,
     };
 
-    let response;
-    try {
-      response = await admin.messaging().sendMulticast(message);
-    } catch (sendError) {
-      console.error('Fallo en sendMulticast:', sendError.message);
-      return res.status(500).json({ error: 'Error al enviar notificación', detail: sendError.message });
-    }
-
-    console.log('Multicast response:', JSON.stringify(response, null, 2));
+    const response = await admin.messaging().sendToDevice(tokens, messagePayload);
 
     const failed = [];
-    response.responses.forEach((resp, index) => {
-      if (!resp.success) {
+    response.results.forEach((result, index) => {
+      if (result.error) {
         failed.push({
           token: tokens[index],
-          error: resp.error?.message || 'Desconocido',
+          error: result.error.message,
         });
       }
     });
 
     return res.status(200).json({
       message: 'Notificación enviada',
-      successCount: response.successCount,
-      failureCount: response.failureCount,
+      successCount: tokens.length - failed.length,
+      failureCount: failed.length,
       failed,
     });
 
