@@ -1,15 +1,5 @@
 const admin = require('firebase-admin');
 const { getMessaging } = require('firebase-admin/messaging');
-const Cors = require('cors');
-const cors = Cors({ origin: true }); // Permite cualquier origen
-
-function runMiddleware(req, res, fn) {
-  return new Promise((resolve, reject) => {
-    fn(req, res, (result) => {
-      return result instanceof Error ? reject(result) : resolve(result);
-    });
-  });
-}
 
 function initFirebase() {
   if (!admin.apps.length) {
@@ -30,8 +20,17 @@ function initFirebase() {
 }
 
 module.exports = async (req, res) => {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Manejar preflight OPTIONS
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   try {
-    await runMiddleware(req, res, cors); // Usar solo esto para CORS
     initFirebase();
 
     if (req.method !== 'POST') {
