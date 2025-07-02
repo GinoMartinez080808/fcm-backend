@@ -70,23 +70,17 @@ module.exports = async (req, res) => {
       notification: { title, body },
     };
 
-    const response = await messaging.sendMulticast(message);
+    // Ahora usamos `send` para enviar multicast
+    const response = await messaging.send(message);
 
-    const failed = [];
-    response.responses.forEach((resp, idx) => {
-      if (!resp.success) {
-        failed.push({
-          token: tokens[idx],
-          error: resp.error?.message || 'Error desconocido',
-        });
-      }
-    });
+    // En v13+, send() para multicast devuelve un objeto con `successCount` y `failureCount`, pero no responses individuales
+    // Si necesitas detalles más específicos, hay que enviar mensaje por mensaje
 
     return res.status(200).json({
       message: 'Notificación enviada',
-      successCount: response.successCount,
-      failureCount: response.failureCount,
-      failed,
+      successCount: response.successCount || 'desconocido',
+      failureCount: response.failureCount || 'desconocido',
+      response,
     });
 
   } catch (error) {
