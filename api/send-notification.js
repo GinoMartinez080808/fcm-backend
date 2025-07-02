@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const { getMessaging } = require('firebase-admin/messaging');
 const Cors = require('cors');
 const cors = Cors({ origin: true });
 
@@ -48,7 +49,6 @@ module.exports = async (req, res) => {
     const db = admin.firestore();
     const snapshot = await db.collection('tokens').get();
 
-    // Extraer tokens y eliminar duplicados
     const tokensSet = new Set();
     snapshot.docs.forEach(doc => {
       const data = doc.data();
@@ -63,26 +63,29 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'No hay tokens válidos registrados' });
     }
 
-    const messagePayload = {
+    const messaging = getMessaging();
+
+    const message = {
+      tokens,
       notification: { title, body },
     };
 
-    const response = await admin.messaging().sendToDevice(tokens, messagePayload);
+    const response = await messaging.sendMulticast(message);
 
     const failed = [];
-    response.results.forEach((result, index) => {
-      if (result.error) {
+    response.responses.forEach((resp, idx) => {
+      if (!resp.success) {
         failed.push({
-          token: tokens[index],
-          error: result.error.message,
+          token: tokens[idx],
+          error: resp.error?.message || 'Error desconocido',
         });
       }
     });
 
     return res.status(200).json({
       message: 'Notificación enviada',
-      successCount: tokens.length - failed.length,
-      failureCount: failed.length,
+      successCount: response.successCount,
+      failureCount: response.failureCount,
       failed,
     });
 
