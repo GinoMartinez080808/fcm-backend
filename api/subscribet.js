@@ -1,15 +1,5 @@
 const admin = require('firebase-admin');
 const { getMessaging } = require('firebase-admin/messaging');
-const Cors = require('cors');
-const cors = Cors({ origin: true }); // Solo permite el origen que lo hizo
-
-function runMiddleware(req, res, fn) {
-  return new Promise((resolve, reject) => {
-    fn(req, res, (result) => {
-      return result instanceof Error ? reject(result) : resolve(result);
-    });
-  });
-}
 
 function initFirebase() {
   if (!admin.apps.length) {
@@ -29,24 +19,25 @@ function initFirebase() {
 }
 
 module.exports = async (req, res) => {
-  // Primero permite CORS de forma manual
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Puedes reemplazar '*' por 'http://localhost:4200'
+  // 👇 Esto se aplica a TODAS las solicitudes (incluso OPTIONS)
+  res.setHeader('Access-Control-Allow-Origin', '*'); // o reemplaza con 'http://localhost:4200' si prefieres
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
+  // 👇 Responder a la preflight request
   if (req.method === 'OPTIONS') {
-    return res.status(200).end(); // Maneja la preflight request
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método no permitido' });
   }
 
   try {
-    await runMiddleware(req, res, cors);
     initFirebase();
 
-    if (req.method !== 'POST') {
-      return res.status(405).json({ error: 'Método no permitido' });
-    }
-
     const { token } = req.body;
+
     if (!token || typeof token !== 'string' || !token.trim()) {
       return res.status(400).json({ error: 'Token requerido y debe ser una cadena válida' });
     }
