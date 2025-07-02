@@ -41,13 +41,26 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Título y cuerpo requeridos' });
     }
 
-    const message = {
-      notification: { title, body },
-      topic: 'admin',
-    };
+    const db = admin.firestore();
+const snapshot = await db.collection('tokens').get();
 
-    const response = await admin.messaging().send(message);
-    return res.status(200).json({ message: 'Notificación enviada', response });
+const tokens = [];
+snapshot.forEach(doc => {
+  tokens.push(doc.id); // el doc ID es el token
+});
+
+if (tokens.length === 0) {
+  return res.status(400).json({ error: 'No hay tokens registrados' });
+}
+
+const message = {
+  notification: { title, body },
+  tokens, // usa `tokens` en vez de `topic`
+};
+
+const response = await admin.messaging().sendMulticast(message);
+console.log('Multicast response:', response);
+return res.status(200).json({ message: 'Notificación enviada a múltiples tokens', response });
 
   } catch (error) {
     console.error('Error enviando notificación:', error);
