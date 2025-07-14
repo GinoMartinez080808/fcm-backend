@@ -3,11 +3,14 @@ const admin = require('firebase-admin');
 const { getMessaging } = require('firebase-admin/messaging');
 const Cors = require('micro-cors');
 
+// CORS config
 const cors = Cors({
-  allowMethods: ['POST', 'OPTIONS'],
   origin: '*',
+  allowMethods: ['POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type']
 });
 
+// Firebase init
 function initFirebase() {
   if (!admin.apps.length) {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -26,21 +29,22 @@ function initFirebase() {
   }
 }
 
-const handler = async (req, res) => {
-  // Preflight CORS
+// Main handler
+async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    // Preflight CORS
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método no permitido' });
   }
 
   try {
     initFirebase();
 
-    if (req.method !== 'POST') {
-      return res.status(405).json({ error: 'Método no permitido' });
-    }
-
     const { token } = req.body;
+
     if (!token || typeof token !== 'string' || !token.trim()) {
       return res.status(400).json({ error: 'Token requerido y debe ser una cadena válida' });
     }
@@ -60,6 +64,7 @@ const handler = async (req, res) => {
       detail: error.message || 'Error desconocido',
     });
   }
-};
+}
 
+// Export wrapped in CORS
 module.exports = cors(handler);
