@@ -1,3 +1,4 @@
+// api/subscribet.js
 const admin = require('firebase-admin');
 const { getMessaging } = require('firebase-admin/messaging');
 const Cors = require('micro-cors');
@@ -26,6 +27,7 @@ function initFirebase() {
 }
 
 const handler = async (req, res) => {
+  // Preflight CORS
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -52,7 +54,7 @@ const handler = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error al suscribirse al topic:', error);
+    console.error('❌ Error al suscribirse al topic:', error);
     return res.status(500).json({
       error: 'Error al suscribirse al topic',
       detail: error.message || 'Error desconocido',
@@ -60,5 +62,4 @@ const handler = async (req, res) => {
   }
 };
 
-// 👇 Exporta con CORS envuelto
 module.exports = cors(handler);
