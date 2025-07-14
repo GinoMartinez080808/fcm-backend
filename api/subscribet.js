@@ -1,5 +1,11 @@
 const admin = require('firebase-admin');
 const { getMessaging } = require('firebase-admin/messaging');
+const Cors = require('micro-cors');
+
+const cors = Cors({
+  allowMethods: ['POST', 'OPTIONS'],
+  origin: '*',
+});
 
 function initFirebase() {
   if (!admin.apps.length) {
@@ -19,13 +25,7 @@ function initFirebase() {
   }
 }
 
-module.exports = async (req, res) => {
-  // ✅ Headers CORS en todas las respuestas
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  // ✅ CORS preflight
+const handler = async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -60,3 +60,5 @@ module.exports = async (req, res) => {
   }
 };
 
+// 👇 Exporta con CORS envuelto
+module.exports = cors(handler);
