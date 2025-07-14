@@ -1,20 +1,6 @@
 const admin = require('firebase-admin');
 const { getMessaging } = require('firebase-admin/messaging');
 
-// === Middleware CORS manual (no cors package) ===
-function handleCors(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    res.status(200).end(); // 👈 CORS preflight response
-    return true;
-  }
-
-  return false;
-}
-
 function initFirebase() {
   if (!admin.apps.length) {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -34,7 +20,16 @@ function initFirebase() {
 }
 
 module.exports = async (req, res) => {
-  if (handleCors(req, res)) return; // 👈 cortar si es OPTIONS
+  // ✅ Headers CORS en todas las respuestas
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // ✅ CORS preflight
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
 
   try {
     initFirebase();
@@ -64,3 +59,4 @@ module.exports = async (req, res) => {
     });
   }
 };
+
